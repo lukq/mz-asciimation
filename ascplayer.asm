@@ -1,4 +1,19 @@
-; Ascii Star Wars player for Sharp MZ-800
+; Ascii Star Wars player for Sharp MZ-800, version 0.9
+; January 2019
+; by Lukas Petru
+
+; Open source under the MIT License (Expat)
+
+; This program can play specially crafted data files containing asciimation.
+; It was created to play the Star Wars asciimation created by Simon Jansen.
+
+; Load this program either from a cassette tape or from a Quick disk. The
+; program is loaded into memory at addresses c000h-c400h and immediately exits.
+; After the player program is loaded, load a data part. The data part will
+; automatically jump to address c000h and start the playback.
+
+
+; Z80 assembly
 
 ; mzf header
 .db 1           ; type
@@ -207,7 +222,7 @@ endline:
 
   jp endarea
 
-  ; ---
+
 nextbitc:
   jr nz,skip
   ld c,(hl)
@@ -249,7 +264,7 @@ nextbyte:
   rl c
   jp havebit
 
-; -----
+
 skip5:
   ; skip five pos
   ld a,18h         ; jr skipmore
@@ -353,22 +368,13 @@ endarea:
 
   ret
 
-; -----
-framemark:
-  inc a
-  jr z,end
 
-  ; set up scrolling
-  pop de
-  ld d,0
-  push de
+frame:
+  call areastart
 
-delay:
   ; read delay
   ld a,(hl)
   inc hl
-  cp 254
-  jr nc,framemark
 
   ; wait
   ld de,23c0h
@@ -378,8 +384,18 @@ delay:
   dec a
   jr nz,$-9
 
+  ; test end
+  ld a,(hl)          ; peek
+  inc a
+  jr z,end
+
   ; test scroll
   pop de
+  inc a
+  jr nz,$+4
+  ld d,a             ; 0fe -start scroll
+  inc hl             ; read
+
   ld a,d
   cp 25
   jr z,noscroll
@@ -406,11 +422,12 @@ delay:
 noscroll:
   push de
 
-frame:
-  call areastart
-  jr delay
+  jr frame
 
 end:
+  ld a,1dh
+  out (0f0h),a
+
   ld a,8
   out (0d0h),a
 waitesc:
@@ -429,7 +446,7 @@ stack .equ islast+7
 data .equ 10
 
 
-; -----
+; =====
 ; data part header
 ;  ld hl,0c000h
 ;  ld a,(hl)
