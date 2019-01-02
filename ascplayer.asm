@@ -1,4 +1,4 @@
-; Ascii Star Wars player for Sharp MZ-800, version 0.9
+; Ascii Star Wars player for Sharp MZ-800, version 1.0
 ; January 2019
 ; by Lukas Petru
 
@@ -11,6 +11,8 @@
 ; program is loaded into memory at addresses c000h-c400h and immediately exits.
 ; After the player program is loaded, load a data part. The data part will
 ; automatically jump to address c000h and start the playback.
+
+; After the playback ends press Del to exit or Ins to replay.
 
 
 ; Z80 assembly
@@ -87,11 +89,16 @@ clrscrn:
   ld a,1fh
   out (0f0h),a
 
+  ld sp,nextpos+2
+  ld hl,21cbh
+  push hl 
+
   ld sp,stack
   ld d,25
   push de
   ld hl,data
   ld c,128
+
   jp frame
 
   .db 0c0h,3 ; SOF
@@ -223,12 +230,26 @@ endline:
   jp endarea
 
 
+nextbyte:
+  ; cy=1
+  ld c,(hl)
+  inc hl
+  rl c
+  jp havebit
+
 nextbitc:
   jr nz,skip
   ld c,(hl)
   inc hl
   rl c
   jr havebitc
+
+nextbits:
+  jr nz,skip5
+  ld c,(hl)
+  inc hl
+  rl c
+  jr havebits
 
 nextbit:
   jr z,nextbyte
@@ -243,30 +264,16 @@ havebitc:
   ; space or skip5
   ; cy=0
   rl c
-  jp nz,havebit5
-  ; cy=1
-  ld c,(hl)
-  inc hl
-  rl c
+havebits:
+  jr c,nextbits
 
-havebit5:
-  jr nc,skip5       ; 100 -skip5
-                    ; 101 -space
+  ;                  100 -space
   exx
   ld bc,0d000h+' '
   jp printchar      ; exx
 
-
-nextbyte:
-  ; cy=1
-  ld c,(hl)
-  inc hl
-  rl c
-  jp havebit
-
-
 skip5:
-  ; skip five pos
+  ; skip five pos    101 -skip5
   ld a,18h         ; jr skipmore
   ld (nextpos),a   ; rewrite nextpos
   ld a,-25         ; jr skipmore
@@ -428,13 +435,14 @@ end:
   ld a,1dh
   out (0f0h),a
 
-  ld a,8
+  ld a,7         ; ins/del
   out (0d0h),a
-waitesc:
+waitkey:
   in a,(0d1h)
   inc a
-  jr z,waitesc
-  jp 0e800h
+  jr z,waitkey
+  jp pe,0c000h    ; replay
+  jp 0e800h      ; exit
   
 
 dskip:
@@ -459,7 +467,7 @@ data .equ 10
 ; 0000-7fff  data
 ; 8000-bfff  VRAM 640*200
 ; c000-      player
-; d000-      char bmaps
+; d000-d7ff  char bmaps
 ; e000-ffff  ROM
 
 ; ipl:
